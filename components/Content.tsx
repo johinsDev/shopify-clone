@@ -1,50 +1,75 @@
 import * as React from "react";
-import { StyleSheet, View, Text, ScrollView } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import Animated from "react-native-reanimated";
+import { onScroll } from "react-native-redash";
 
-import { Album, MAX_HEADER_HEIGHT, HEADER_DELTA } from "./Model";
+import { Album, MAX_HEADER_HEIGHT, MIN_HEADER_HEIGHT } from "./Model";
 import Track from "./Track";
+import ShufflePlay, { BUTTON_HEIGHT } from "./ShufflePlay";
+import Header from "./Header";
 
 interface ContentProps {
   album: Album;
+  y: Animated.Value<number>;
 }
 
-export default ({ album: { artist, tracks } }: ContentProps) => {
-  const height = MAX_HEADER_HEIGHT;
+const { interpolate, Extrapolate } = Animated;
+
+export default ({ album: { artist, tracks }, y }: ContentProps) => {
+  const height = interpolate(y, {
+    inputRange: [-MAX_HEADER_HEIGHT, -BUTTON_HEIGHT / 2],
+    outputRange: [0, MAX_HEADER_HEIGHT + BUTTON_HEIGHT],
+    extrapolate: Extrapolate.CLAMP
+  });
+  const opacity = interpolate(y, {
+    inputRange: [-MAX_HEADER_HEIGHT / 2, 0, MAX_HEADER_HEIGHT / 2],
+    outputRange: [0, 1, 0],
+    extrapolate: Extrapolate.CLAMP
+  });
   return (
-    <ScrollView
+    <Animated.ScrollView
+      onScroll={onScroll({ y })}
       style={styles.container}
       showsVerticalScrollIndicator={false}
       scrollEventThrottle={1}
+      stickyHeaderIndices={[1]}
     >
-      <View style={styles.header}>
-        <View style={[styles.gradient, { height }]}>
+      <View style={styles.cover}>
+        <Animated.View style={[styles.gradient, { height }]}>
           <LinearGradient
             style={StyleSheet.absoluteFill}
             start={[0, 0.3]}
             end={[0, 1]}
             colors={["transparent", "rgba(0, 0, 0, 0.2)", "black"]}
           />
-        </View>
+        </Animated.View>
         <View style={styles.artistContainer}>
-          <Text style={styles.artist}>{artist}</Text>
+          <Animated.Text style={[styles.artist, { opacity }]}>
+            {artist}
+          </Animated.Text>
         </View>
+      </View>
+      <View style={styles.header}>
+        <Header {...{ y, artist }} />
+        <ShufflePlay />
       </View>
       <View style={styles.tracks}>
         {tracks.map((track, key) => (
           <Track index={key + 1} {...{ track, key, artist }} />
         ))}
       </View>
-    </ScrollView>
+    </Animated.ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1
+    flex: 1,
+    paddingTop: MIN_HEADER_HEIGHT - BUTTON_HEIGHT / 2
   },
-  header: {
-    height: MAX_HEADER_HEIGHT
+  cover: {
+    height: MAX_HEADER_HEIGHT - BUTTON_HEIGHT
   },
   gradient: {
     position: "absolute",
@@ -63,6 +88,9 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 48,
     fontWeight: "bold"
+  },
+  header: {
+    marginTop: -BUTTON_HEIGHT
   },
   tracks: {
     paddingTop: 32,
